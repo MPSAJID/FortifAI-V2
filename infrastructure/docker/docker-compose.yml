@@ -1,0 +1,161 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: fortifai-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-fortifai}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-fortifai_secure_password}
+      POSTGRES_DB: ${DB_NAME:-fortifai}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-fortifai}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fortifai-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: fortifai-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - fortifai-network
+
+  # API Service
+  api:
+    build:
+      context: ../../backend/api
+      dockerfile: Dockerfile
+    container_name: fortifai-api
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-fortifai}:${DB_PASSWORD:-fortifai_secure_password}@postgres:5432/${DB_NAME:-fortifai}
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - ML_ENGINE_URL=http://ml-engine:5000
+      - ALERT_SERVICE_URL=http://alert-service:5001
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ../../backend/api:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - fortifai-network
+
+  # ML Engine
+  ml-engine:
+    build:
+      context: ../../backend/ml-engine
+      dockerfile: Dockerfile
+    container_name: fortifai-ml
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-fortifai}:${DB_PASSWORD:-fortifai_secure_password}@postgres:5432/${DB_NAME:-fortifai}
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ../../backend/ml-engine:/app
+      - ml_models:/app/models
+    networks:
+      - fortifai-network
+
+  # Alert Service
+  alert-service:
+    build:
+      context: ../../backend/alert-service
+      dockerfile: Dockerfile
+    container_name: fortifai-alerts
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-fortifai}:${DB_PASSWORD:-fortifai_secure_password}@postgres:5432/${DB_NAME:-fortifai}
+      - REDIS_URL=redis://redis:6379
+      - SMTP_SERVER=${SMTP_SERVER:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - FROM_EMAIL=${FROM_EMAIL:-}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - TEAMS_WEBHOOK_URL=${TEAMS_WEBHOOK_URL:-}
+    ports:
+      - "5001:5001"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - fortifai-network
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ../../backend/auth-service
+      dockerfile: Dockerfile
+    container_name: fortifai-auth
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-fortifai}:${DB_PASSWORD:-fortifai_secure_password}@postgres:5432/${DB_NAME:-fortifai}
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+    ports:
+      - "5002:5002"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - fortifai-network
+
+  # Data Collector
+  data-collector:
+    build:
+      context: ../../backend/data-collector
+      dockerfile: Dockerfile
+    container_name: fortifai-collector
+    environment:
+      - API_URL=http://api:8000
+      - ML_ENGINE_URL=http://ml-engine:5000
+      - COLLECTION_INTERVAL=30
+    depends_on:
+      - api
+      - ml-engine
+    volumes:
+      - /var/log:/var/log:ro
+    networks:
+      - fortifai-network
+
+  # Dashboard Frontend
+  dashboard:
+    build:
+      context: ../../frontend/dashboard
+      dockerfile: Dockerfile
+    container_name: fortifai-dashboard
+    environment:
+      - API_URL=http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - fortifai-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  ml_models:
+
+networks:
+  fortifai-network:
+    driver: bridge

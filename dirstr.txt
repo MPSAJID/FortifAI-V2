@@ -1,0 +1,103 @@
+FortifAI-V2/
+├── backend/
+│   ├── api/                         # FastAPI REST API
+│   │   ├── core/                    # Config, database, security
+│   │   ├── models/                  # SQLAlchemy models
+│   │   ├── schemas/                 # Pydantic schemas
+│   │   ├── routers/                 # API endpoints
+│   │   ├── main.py                  # Application entry
+│   │   ├── Dockerfile
+│   │   └── requirements.txt
+│   ├── ml-engine/                   # ML Service
+│   │   ├── main.py                  # FastAPI ML endpoints
+│   │   ├── threat_classifier.py     # (existing)
+│   │   ├── behaviour_analytics.py   # (existing)
+│   │   ├── anomaly_detector.py      # NEW
+│   │   ├── Dockerfile
+│   │   └── requirements.txt
+│   ├── data-collector/              # Log collectors
+│   │   ├── collectors/              # File, process, network, event
+│   │   ├── main.py
+│   │   ├── Dockerfile
+│   │   └── requirements.txt
+│   ├── alert-service/               # Alert management
+│   │   ├── main.py                  # FastAPI service
+│   │   ├── Dockerfile
+│   │   └── requirements.txt
+│   ├── auth-service/                # Authentication
+│   │   ├── main.py                  # FastAPI service
+│   │   ├── Dockerfile
+│   │   └── requirements.txt
+│   └── common/                      # Shared utilities
+│       ├── logger.py, redis_client.py, utils.py, constants.py
+├── frontend/
+│   ├── dashboard/                   # React/Next.js Dashboard
+│   │   ├── src/app/                 # Next.js App Router
+│   │   ├── src/components/          # React components
+│   │   ├── src/lib/api.ts           # API client
+│   │   └── package.json, configs
+│   └── admin-panel/                 # Admin interface
+├── ml-models/                       # Model storage
+│   ├── anomaly-detection/
+│   ├── threat-classification/
+│   └── behavior-analysis/
+├── infrastructure/
+│   ├── docker/                      # docker-compose.yml, init.sql
+│   ├── kubernetes/                  # K8s deployments
+│   └── terraform/                   # AWS IaC
+├── docs/                            # API.md, DEPLOYMENT.md, DEVELOPMENT.md
+├── tests/                           # pytest test suites
+├── scripts/                         # train_models.py, setup_database.py, start_dev
+├── README.md
+├── .env.example
+├── .gitignore
+└── pytest.ini
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+FortifAI/
+├── backend/
+│   ├── api/                    # FastAPI REST API
+│   ├── ml-engine/              # Machine Learning Models
+│   ├── data-collector/         # Log & Process Collectors
+│   ├── alert-service/          # Alert Management
+│   ├── auth-service/           # Authentication & Authorization
+│   └── common/                 # Shared utilities
+├── frontend/
+│   ├── dashboard/              # React Dashboard
+│   └── admin-panel/            # Admin Panel
+├── ml-models/
+│   ├── anomaly-detection/      # Anomaly Detection Models
+│   ├── threat-classification/  # Threat Classification
+│   └── behavior-analysis/      # User Behavior Analytics
+├── infrastructure/
+│   ├── docker/                 # Docker configurations
+│   ├── kubernetes/             # K8s deployments
+│   └── terraform/              # Infrastructure as Code
+├── docs/                       # Documentation
+├── tests/                      # Test suites
+└── scripts/                    # Utility scripts

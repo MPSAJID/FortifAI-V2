@@ -1,0 +1,132 @@
+"""Alerts Router"""
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, desc
+from typing import List, Optional
+from datetime import datetime
+import uuid
+
+from core.database import get_db
+from core.security import get_current_user
+from models.alert import Alert
+from schemas.alert import AlertCreate, AlertResponse, AlertUpdate
+
+router = APIRouter()
+
+@router.get("/", response_model=List[AlertResponse])
+async def get_alerts(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    severity: Optional[str] = None,
+    status: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all alerts with optional filtering"""
+    query = select(Alert).order_by(desc(Alert.created_at))
+    
+    if severity:
+        query = query.where(Alert.severity == severity.upper())
+    if status:
+        query = query.where(Alert.status == status)
+    
+    query = query.offset(skip).limit(limit)
+    result = await db.execute(query)
+    
+    return result.scalars().all()
+
+@router.post("/", response_model=AlertResponse)
+async def create_alert(
+    alert_data: AlertCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new alert"""
+    alert_id = f"ALERT-{datetime.now().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:8]}"
+    
+    db_alert = Alert(
+        alert_id=alert_id,
+        title=alert_data.title,
+        message=alert_data.message,
+        severity=alert_data.severity.upper(),
+        source=alert_data.source,
+        metadata=alert_data.metadata
+    )
+    
+    db.add(db_alert)
+    await db.commit()
+    await db.refresh(db_alert)
+    
+    return db_alert
+
+@router.get("/{alert_id}", response_model=AlertResponse)
+async def get_alert(
+    alert_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific alert by ID"""
+    result = await db.execute(
+        select(Alert).where(Alert.alert_id == alert_id)
+    )
+    alert = result.scalar_one_or_none()
+    
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    
+    return alert
+
+@router.patch("/{alert_id}", response_model=AlertResponse)
+async def update_alert(
+    alert_id: str,
+    alert_update: AlertUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Update an alert status"""
+    result = await db.execute(
+        select(Alert).where(Alert.alert_id == alert_id)
+    )
+    alert = result.scalar_one_or_none()
+    
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    
+    if alert_update.status:
+        alert.status = alert_update.status
+    if alert_update.acknowledged is not None:
+        alert.acknowledged = alert_update.acknowledged
+    if alert_update.resolved is not None:
+        alert.resolved = alert_update.resolved
+        if alert_update.resolved:
+            alert.resolved_at = datetime.now()
+            alert.status = "resolved"
+    
+    await db.commit()
+    await db.refresh(alert)
+    
+    return alert
+
+@router.get("/stats/summary")
+async def get_alert_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get alert statistics summary"""
+    result = await db.execute(select(Alert))
+    alerts = result.scalars().all()
+    
+    stats = {
+        "total": len(alerts),
+        "by_severity": {},
+        "by_status": {},
+        "unresolved": 0
+    }
+    
+    for alert in alerts:
+        stats["by_severity"][alert.severity] = stats["by_severity"].get(alert.severity, 0) + 1
+        stats["by_status"][alert.status] = stats["by_status"].get(alert.status, 0) + 1
+        if not alert.resolved:
+            stats["unresolved"] += 1
+    
+    return stats
