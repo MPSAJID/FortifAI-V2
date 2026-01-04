@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 
-from routers import auth, alerts, threats, analytics, health, users
+from routers import auth, alerts, threats, analytics, health, users, scanner
 from core.config import settings
 from core.database import init_db
 
@@ -43,6 +43,7 @@ app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["Alerts"])
 app.include_router(threats.router, prefix="/api/v1/threats", tags=["Threats"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(users.router, prefix="/api/v1", tags=["Users"])
+app.include_router(scanner.router, prefix="/api/v1/scanner", tags=["Scanner", "Reconnaissance"])
 
 @app.get("/")
 async def root():

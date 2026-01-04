@@ -122,6 +122,41 @@ export const api = {
     const response = await apiClient.post(`/api/v1/users/${id}/activate`)
     return response.data
   },
+
+  // Scanner (SubVeil Integration)
+  extractUrl: async (url: string) => {
+    const response = await apiClient.post('/api/v1/scanner/extract', { url })
+    return response.data
+  },
+
+  extractBatchUrls: async (urls: string[]) => {
+    const response = await apiClient.post('/api/v1/scanner/extract-batch', { urls })
+    return response.data
+  },
+
+  deepScanUrl: async (url: string) => {
+    const response = await apiClient.post('/api/v1/scanner/deep-scan', { url })
+    return response.data
+  },
+
+  quickScanUrl: async (url: string) => {
+    const response = await apiClient.post('/api/v1/scanner/quick-scan', { url })
+    return response.data
+  },
+
+  getScannerCapabilities: async () => {
+    const response = await apiClient.get('/api/v1/scanner/capabilities')
+    return response.data
+  },
+
+  analyzePcap: async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await apiClient.post('/api/v1/scanner/analyze-pcap', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return response.data
+  },
 }
 
 export default apiClient

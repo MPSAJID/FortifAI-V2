@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortifai-data-collector
+  labels:
+    app: fortifai
+    component: data-collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fortifai
+      component: data-collector
+  template:
+    metadata:
+      labels:
+        app: fortifai
+        component: data-collector
+    spec:
+      containers:
+      - name: data-collector
+        image: fortifai/data-collector:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: fortifai-secrets
+              key: redis-url
+        - name: ML_ENGINE_URL
+          value: "http://fortifai-ml-engine:8001"
+        - name: COLLECTION_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: fortifai-config
+              key: collection-interval
+        - name: BATCH_SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: fortifai-config
+              key: batch-size
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: host-logs
+          mountPath: /var/log
+          readOnly: true
+        - name: host-proc
+          mountPath: /host/proc
+          readOnly: true
+        securityContext:
+          privileged: false
+          readOnlyRootFilesystem: true
+      volumes:
+      - name: host-logs
+        hostPath:
+          path: /var/log
+          type: Directory
+      - name: host-proc
+        hostPath:
+          path: /proc
+          type: Directory
+      serviceAccountName: fortifai-collector
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortifai-data-collector
+  labels:
+    app: fortifai
+    component: data-collector
+spec:
+  selector:
+    app: fortifai
+    component: data-collector
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fortifai-collector
+  labels:
+    app: fortifai
+    component: data-collector

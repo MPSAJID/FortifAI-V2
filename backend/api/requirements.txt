@@ -18,7 +18,14 @@ bcrypt==4.0.1
 
 # HTTP Client
 httpx==0.26.0
+requests==2.31.0
 
 # Utilities
 python-multipart==0.0.6
 email-validator==2.1.0
+
+# Scanner Module (SubVeil integration)
+python-whois==0.9.3
+dnspython==2.4.2
+cryptography>=41.0.0
+pyshark==0.6  # Optional: for PCAP analysis

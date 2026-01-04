@@ -9,11 +9,13 @@ import {
   Activity, 
   Users,
   Settings,
-  LogOut
+  LogOut,
+  Search
 } from 'lucide-react'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Scanner', href: '/scanner', icon: Search },
   { name: 'Alerts', href: '/alerts', icon: AlertTriangle },
   { name: 'Threats', href: '/threats', icon: Shield },
   { name: 'Analytics', href: '/analytics', icon: Activity },
