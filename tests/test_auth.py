@@ -2,7 +2,10 @@
 FortifAI Authentication Tests
 """
 import pytest
-from backend.auth_service.main import AuthService
+import importlib
+
+auth_service = importlib.import_module('backend.auth-service.main')
+AuthService = auth_service.AuthService
 
 class TestAuthService:
     """Tests for AuthService"""

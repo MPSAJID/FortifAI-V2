@@ -2,7 +2,7 @@
 FortifAI API Tests
 """
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from backend.api.main import app
 
 @pytest.fixture
@@ -11,7 +11,8 @@ def anyio_backend():
 
 @pytest.fixture
 async def client():
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
 @pytest.mark.anyio
