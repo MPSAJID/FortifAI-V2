@@ -51,7 +51,7 @@ FortifAI-V2/
 ├── README.md
 ├── .env.example
 ├── .gitignore
-└── pytest.ini
+└── pytest.ini\
 
 
 
