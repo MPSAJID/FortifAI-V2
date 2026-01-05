@@ -1,7 +1,7 @@
 """Threat Log Model"""
 from sqlalchemy import Column, Integer, String, Float, DateTime, JSON, Text
 from sqlalchemy.sql import func
-from core.database import Base
+from backend.api.core.database import Base
 
 class ThreatLog(Base):
     __tablename__ = "threat_logs"

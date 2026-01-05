@@ -5,10 +5,10 @@ from sqlalchemy import select, func, update, delete
 from typing import List, Optional
 from datetime import datetime
 
-from core.database import get_db
-from core.security import get_current_user, get_password_hash, require_role
-from models.user import User
-from schemas.user import UserCreate, UserResponse, UserBase
+from backend.api.core.database import get_db
+from backend.api.core.security import get_current_user, get_password_hash, require_role
+from backend.api.models.user import User
+from backend.api.schemas.user import UserCreate, UserResponse, UserBase
 
 router = APIRouter(prefix="/users", tags=["users"])
 

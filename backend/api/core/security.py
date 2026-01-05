@@ -9,8 +9,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from core.config import settings
-from core.database import get_db
+from backend.api.core.config import settings
+from backend.api.core.database import get_db
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
@@ -42,7 +42,7 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db)
 ):
     """Validate token and return current user from database"""
-    from models.user import User  # Import here to avoid circular import
+    from backend.api.models.user import User  # Import here to avoid circular import
     
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

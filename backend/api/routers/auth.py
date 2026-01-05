@@ -5,17 +5,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import timedelta
 
-from core.database import get_db
-from core.security import (
+from backend.api.core.database import get_db
+from backend.api.core.security import (
     verify_password, 
     get_password_hash, 
     create_access_token,
     create_refresh_token,
     get_current_user
 )
-from core.config import settings
-from models.user import User
-from schemas.user import UserCreate, UserResponse, Token
+from backend.api.core.config import settings
+from backend.api.models.user import User
+from backend.api.schemas.user import UserCreate, UserResponse, Token
 
 router = APIRouter()
 

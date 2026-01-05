@@ -29,8 +29,36 @@ except ImportError:
     # Fallback if common module not available
     import logging
     logging.basicConfig(level=logging.INFO)
+    
+    class StructuredLoggerWrapper:
+        """Wrapper that makes standard logging accept keyword arguments like structlog"""
+        def __init__(self, logger):
+            self._logger = logger
+        
+        def _format_message(self, msg, **kwargs):
+            if kwargs:
+                extras = " ".join(f"{k}={v}" for k, v in kwargs.items())
+                return f"{msg} | {extras}"
+            return msg
+        
+        def info(self, msg, *args, **kwargs):
+            self._logger.info(self._format_message(msg, **kwargs), *args)
+        
+        def warning(self, msg, *args, **kwargs):
+            self._logger.warning(self._format_message(msg, **kwargs), *args)
+        
+        def error(self, msg, *args, **kwargs):
+            self._logger.error(self._format_message(msg, **kwargs), *args)
+        
+        def debug(self, msg, *args, **kwargs):
+            self._logger.debug(self._format_message(msg, **kwargs), *args)
+        
+        def critical(self, msg, *args, **kwargs):
+            self._logger.critical(self._format_message(msg, **kwargs), *args)
+    
     def get_logger(name):
-        return logging.getLogger(name)
+        return StructuredLoggerWrapper(logging.getLogger(name))
+    
     SecurityLogger = None
     RedisClient = None
     generate_id = lambda prefix="": f"{prefix}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
@@ -52,6 +80,7 @@ class DataCollectorService:
     def __init__(self):
         self.api_url = os.getenv("API_URL", "http://localhost:8000")
         self.ml_engine_url = os.getenv("ML_ENGINE_URL", "http://localhost:5000")
+        self.internal_api_key = os.getenv("INTERNAL_API_KEY", "fortifai-internal-service-key")
         
         # Initialize collectors
         self.collectors = {
@@ -234,16 +263,19 @@ class DataCollectorService:
     
     async def _send_to_ml_engine_batch(self, logs: List[Dict]):
         """Send collected logs to ML engine in batches for analysis"""
+        headers = {"Content-Type": "application/json"}
         async with httpx.AsyncClient(timeout=30.0) as client:
             # Process in batches
             for i in range(0, len(logs), self.batch_size):
                 batch = logs[i:i + self.batch_size]
+                sanitized_batch = [self._sanitize_log(log) for log in batch]
                 
                 try:
                     # Send batch to ML engine
                     response = await client.post(
                         f"{self.ml_engine_url}/analyze/batch",
-                        json={"logs": batch},
+                        json={"logs": sanitized_batch},
+                        headers=headers,
                         timeout=30.0
                     )
                     
@@ -274,14 +306,32 @@ class DataCollectorService:
                     # Fallback to individual processing on error
                     await self._send_to_ml_engine(batch)
     
+    def _sanitize_log(self, log: Dict) -> Dict:
+        """Sanitize log data to ensure JSON serialization"""
+        sanitized = {}
+        for key, value in log.items():
+            if value is None:
+                sanitized[key] = None
+            elif isinstance(value, (str, int, float, bool)):
+                sanitized[key] = value
+            elif isinstance(value, (list, dict)):
+                sanitized[key] = value
+            else:
+                # Convert other types to string
+                sanitized[key] = str(value)
+        return sanitized
+    
     async def _send_to_ml_engine(self, logs: List[Dict]):
         """Send collected logs to ML engine individually (fallback method)"""
+        headers = {"Content-Type": "application/json"}
         async with httpx.AsyncClient(timeout=15.0) as client:
             try:
                 for log in logs:
+                    sanitized_log = self._sanitize_log(log)
                     response = await client.post(
                         f"{self.ml_engine_url}/analyze",
-                        json={"log_data": log},
+                        json={"log_data": sanitized_log},
+                        headers=headers,
                         timeout=10.0
                     )
                     
@@ -290,6 +340,11 @@ class DataCollectorService:
                         if result.get("is_threat", False):
                             self.stats["total_threats"] += 1
                             await self._create_alert(log, result)
+                    elif response.status_code == 422:
+                        logger.warning("ml_engine_validation_error", 
+                                     status=response.status_code,
+                                     response=response.text,
+                                     log_keys=list(sanitized_log.keys()))
                             
             except httpx.HTTPError as e:
                 logger.error("ml_engine_communication_error", error=str(e))
@@ -327,8 +382,9 @@ class DataCollectorService:
                     self.redis_client.publish("alerts:new", alert_data)
                 
                 response = await client.post(
-                    f"{self.api_url}/api/v1/alerts",
+                    f"{self.api_url}/api/v1/alerts/internal",
                     json=alert_data,
+                    headers={"X-Internal-Key": self.internal_api_key},
                     timeout=10.0
                 )
                 

@@ -22,6 +22,9 @@ anomaly_detector = AnomalyDetector()
 class AnalyzeRequest(BaseModel):
     log_data: Dict[str, Any]
     
+    class Config:
+        extra = "allow"  # Allow extra fields
+    
 class AnalyzeResponse(BaseModel):
     is_threat: bool
     threat_type: str
@@ -57,11 +60,29 @@ async def health():
         }
     }
 
+@app.post("/analyze/debug")
+async def analyze_debug(request: dict):
+    """Debug endpoint to see raw request"""
+    print(f"Received raw request: {request}")
+    return {"received": request, "type": str(type(request))}
+
 @app.post("/analyze", response_model=AnalyzeResponse)
-async def analyze_log(request: AnalyzeRequest):
-    """Analyze a log entry for potential threats"""
+async def analyze_log(request: dict):
+    """Analyze a log entry for potential threats
+    
+    Accepts either:
+    - {"log_data": {...}} format
+    - Raw log data directly
+    """
     try:
-        result = threat_classifier.predict(request.log_data)
+        # Handle both wrapped and unwrapped log data
+        if "log_data" in request:
+            log_data = request["log_data"]
+        else:
+            log_data = request
+        
+        print(f"Analyzing log data: {log_data}")
+        result = threat_classifier.predict(log_data)
         
         is_threat = result['classification'] != 'normal'
         
@@ -78,6 +99,7 @@ async def analyze_log(request: AnalyzeRequest):
             recommendations=recommendations
         )
     except Exception as e:
+        print(f"Error analyzing log: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/behavior/record")

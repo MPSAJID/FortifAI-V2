@@ -1,14 +1,34 @@
 """
 FortifAI - FastAPI Main Application
 """
+import sys
+import os
+
+# Add parent directory to path to support 'backend.api' imports in Docker
+# This makes imports work both locally and in Docker container
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+# Also add current directory as 'backend/api' for relative-style absolute imports
+if os.path.basename(os.getcwd()) == 'app':
+    # Running in Docker - /app is backend/api
+    sys.path.insert(0, os.path.dirname(os.getcwd()))
+    # Create the backend.api package structure in sys.modules
+    import types
+    backend_module = types.ModuleType('backend')
+    backend_module.__path__ = [os.path.dirname(os.getcwd())]
+    sys.modules['backend'] = backend_module
+    
+    backend_api_module = types.ModuleType('backend.api')
+    backend_api_module.__path__ = [os.getcwd()]
+    sys.modules['backend.api'] = backend_api_module
+
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 
-from routers import auth, alerts, threats, analytics, health, users, scanner
-from core.config import settings
-from core.database import init_db
+from backend.api.routers import auth, alerts, threats, analytics, health, users, scanner
+from backend.api.core.config import settings
+from backend.api.core.database import init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

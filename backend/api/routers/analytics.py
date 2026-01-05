@@ -5,10 +5,10 @@ from sqlalchemy import select, func
 from typing import Optional
 from datetime import datetime, timedelta
 
-from core.database import get_db
-from core.security import get_current_user
-from models.alert import Alert
-from models.threat import ThreatLog
+from backend.api.core.database import get_db
+from backend.api.core.security import get_current_user
+from backend.api.models.alert import Alert
+from backend.api.models.threat import ThreatLog
 
 router = APIRouter()
 

@@ -1,7 +1,7 @@
 """Alert Model"""
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, JSON
 from sqlalchemy.sql import func
-from core.database import Base
+from backend.api.core.database import Base
 
 class Alert(Base):
     __tablename__ = "alerts"

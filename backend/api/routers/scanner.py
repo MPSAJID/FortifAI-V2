@@ -10,9 +10,9 @@ from typing import List, Optional
 import tempfile
 import os
 
-from scanner.url_extractor import URLExtractor
-from scanner.deep_scanner import DeepScanner
-from scanner.network_analyzer import NetworkAnalyzer, TrafficAnalyzer
+from backend.api.scanner.url_extractor import URLExtractor
+from backend.api.scanner.deep_scanner import DeepScanner
+from backend.api.scanner.network_analyzer import NetworkAnalyzer, TrafficAnalyzer
 
 router = APIRouter()
 

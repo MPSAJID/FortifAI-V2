@@ -7,11 +7,11 @@ from datetime import datetime
 import uuid
 import httpx
 
-from core.database import get_db
-from core.security import get_current_user
-from core.config import settings
-from models.threat import ThreatLog
-from schemas.threat import ThreatLogCreate, ThreatLogResponse, ThreatAnalysisRequest, ThreatAnalysisResponse
+from backend.api.core.database import get_db
+from backend.api.core.security import get_current_user
+from backend.api.core.config import settings
+from backend.api.models.threat import ThreatLog
+from backend.api.schemas.threat import ThreatLogCreate, ThreatLogResponse, ThreatAnalysisRequest, ThreatAnalysisResponse
 
 router = APIRouter()
 

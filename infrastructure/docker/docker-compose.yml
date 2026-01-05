@@ -43,6 +43,7 @@ services:
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
       - ML_ENGINE_URL=http://ml-engine:5000
       - ALERT_SERVICE_URL=http://alert-service:5001
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-fortifai-internal-service-key}
     ports:
       - "8000:8000"
     depends_on:
@@ -128,6 +129,7 @@ services:
       - API_URL=http://api:8000
       - ML_ENGINE_URL=http://ml-engine:5000
       - COLLECTION_INTERVAL=30
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-fortifai-internal-service-key}
     depends_on:
       - api
       - ml-engine

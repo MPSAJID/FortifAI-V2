@@ -4,7 +4,7 @@ Database Configuration and Session Management
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy import create_engine
-from core.config import settings
+from backend.api.core.config import settings
 
 # Convert postgresql:// to postgresql+asyncpg:// for async
 ASYNC_DATABASE_URL = settings.DATABASE_URL.replace(
