@@ -9,6 +9,7 @@ from tensorflow import keras
 from datetime import datetime
 import joblib
 import json
+import os
 
 class ThreatClassifier:
     """
@@ -16,7 +17,7 @@ class ThreatClassifier:
     and deep learning for accurate threat detection.
     """
     
-    def __init__(self):
+    def __init__(self, model_path: str = None):
         self.rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
         self.gb_model = GradientBoostingClassifier(n_estimators=100, random_state=42)
         self.deep_model = None
@@ -27,6 +28,107 @@ class ThreatClassifier:
             'ddos', 'brute_force', 'data_exfiltration', 'privilege_escalation'
         ]
         self.is_trained = False
+        self.feature_columns = None
+        
+        # Try to load pre-trained models on init
+        if model_path:
+            self.load_trained_models(model_path)
+        else:
+            # Check default paths
+            default_paths = [
+                '/app/models/trained',
+                './models/trained',
+                '../ml-models/threat-classification/trained'
+            ]
+            for path in default_paths:
+                if os.path.exists(path) and os.path.exists(f'{path}/rf_model.joblib'):
+                    print(f"Found trained models at {path}")
+                    self.load_trained_models(path)
+                    break
+    
+    def load_trained_models(self, path: str):
+        """Load pre-trained sklearn models"""
+        try:
+            self.rf_model = joblib.load(f'{path}/rf_model.joblib')
+            self.gb_model = joblib.load(f'{path}/gb_model.joblib')
+            self.scaler = joblib.load(f'{path}/scaler.joblib')
+            self.label_encoder = joblib.load(f'{path}/label_encoder.joblib')
+            
+            # Load feature columns
+            if os.path.exists(f'{path}/feature_columns.json'):
+                with open(f'{path}/feature_columns.json', 'r') as f:
+                    self.feature_columns = json.load(f)
+            
+            self.is_trained = True
+            print(f"✓ Loaded trained models from {path}")
+            print(f"  Classes: {list(self.label_encoder.classes_)}")
+            return True
+        except Exception as e:
+            print(f"Could not load models from {path}: {e}")
+            return False
+    
+    def extract_features_for_trained_model(self, log_entry):
+        """Extract features matching the trained model's feature columns.
+        This must match the features used in train_hybrid.py"""
+        
+        process_name = (log_entry.get('process_name') or '').lower()
+        cmdline = (log_entry.get('command_line') or log_entry.get('cmdline') or '').lower()
+        username = (log_entry.get('username') or log_entry.get('user') or '').lower()
+        
+        # Known threat indicators in command line
+        encoded_patterns = ['base64', 'encodedcommand', '-enc', '-e ', 'frombase64']
+        download_patterns = ['wget', 'curl', 'downloadstring', 'invoke-webrequest', 'bitsadmin', 'certutil -urlcache']
+        connect_patterns = ['reverse', 'shell', 'connect', 'bind', 'nc.exe', 'ncat', 'netcat']
+        encrypt_patterns = ['encrypt', 'cipher', 'crypt', 'ransom', 'locked', 'vssadmin delete']
+        cred_dump_patterns = ['mimikatz', 'procdump', 'lsass', 'sekurlsa', 'sam ', 'hashdump']
+        
+        # Known malicious tools
+        mimikatz_patterns = ['mimikatz', 'sekurlsa', 'logonpasswords', 'lsadump', 'kerberos::']
+        psexec_patterns = ['psexec', 'paexec', 'remcom', 'csexec']
+        bloodhound_patterns = ['bloodhound', 'sharphound', 'adrecon', 'powerview']
+        cobalt_patterns = ['cobaltstrike', 'beacon', 'cobalt']
+        lateral_patterns = ['psexec', 'wmiexec', 'smbexec', 'atexec', 'dcomexec', 'winrm']
+        priv_esc_patterns = ['juicypotato', 'printspoofer', 'godpotato', 'sweetpotato', 'getsystem']
+        
+        # Known malware names
+        malware_names = [
+            'emotet', 'trickbot', 'qbot', 'icedid', 'dridex', 'njrat', 'asyncrat',
+            'remcos', 'agenttesla', 'formbook', 'lokibot', 'ryuk', 'conti', 'lockbit',
+            'revil', 'darkside', 'xmrig', 'cgminer', 'wannacry', 'cryptolocker'
+        ]
+        
+        # Typosquatting check (misspelled Windows processes)
+        typosquat_targets = ['svch0st', 'scvhost', 'svhost', 'crss', 'cssrs', 'lssas', 'isass', 'expl0rer']
+        has_typo = any(typo in process_name for typo in typosquat_targets)
+        
+        # Check for known malware
+        known_malware = any(m in process_name or m in cmdline for m in malware_names)
+        
+        features = {
+            'cpu_usage': float(log_entry.get('cpu_usage') or log_entry.get('cpu_percent') or 0),
+            'memory_usage': float(log_entry.get('memory_usage') or log_entry.get('memory_percent') or 0),
+            'name_length': len(process_name),
+            'cmd_length': len(cmdline),
+            'has_args': 1 if ' ' in cmdline else 0,
+            'has_network': 1 if log_entry.get('network_connections') or log_entry.get('connections') else 0,
+            'connections': int(log_entry.get('network_connections') or log_entry.get('connections') or 0),
+            'is_system_user': 1 if username in ['system', 'root', 'nt authority\\system'] else 0,
+            'encoded_cmd': 1 if any(p in cmdline for p in encoded_patterns) else 0,
+            'download_cmd': 1 if any(p in cmdline for p in download_patterns) else 0,
+            'connect_cmd': 1 if any(p in cmdline for p in connect_patterns) else 0,
+            'encrypt_cmd': 1 if any(p in cmdline for p in encrypt_patterns) else 0,
+            'cred_dump': 1 if any(p in cmdline or p in process_name for p in cred_dump_patterns) else 0,
+            'is_mimikatz': 1 if any(p in cmdline or p in process_name for p in mimikatz_patterns) else 0,
+            'is_psexec': 1 if any(p in cmdline or p in process_name for p in psexec_patterns) else 0,
+            'is_bloodhound': 1 if any(p in cmdline or p in process_name for p in bloodhound_patterns) else 0,
+            'is_cobalt': 1 if any(p in cmdline or p in process_name for p in cobalt_patterns) else 0,
+            'has_typo': 1 if has_typo else 0,
+            'known_malware': 1 if known_malware else 0,
+            'lateral_movement': 1 if any(p in cmdline for p in lateral_patterns) else 0,
+            'priv_esc': 1 if any(p in cmdline or p in process_name for p in priv_esc_patterns) else 0,
+        }
+        
+        return features
         
     def build_deep_model(self, input_dim):
         """Build deep neural network for threat classification"""
@@ -219,22 +321,26 @@ class ThreatClassifier:
             # Return rule-based analysis when model not trained
             return self._rule_based_prediction(log_entry)
         
-        features = self.extract_advanced_features(log_entry)
-        X = pd.DataFrame([features])
+        # Use trained model feature extraction if feature_columns are available
+        if self.feature_columns:
+            features = self.extract_features_for_trained_model(log_entry)
+            # Ensure features are in the correct order
+            X = pd.DataFrame([features])[self.feature_columns]
+        else:
+            features = self.extract_advanced_features(log_entry)
+            X = pd.DataFrame([features])
+        
         X_scaled = self.scaler.transform(X)
         
-        # Get predictions from all models
+        # Get predictions from sklearn models (no deep model with pre-trained)
         rf_pred = self.rf_model.predict(X_scaled)[0]
         rf_proba = self.rf_model.predict_proba(X_scaled)[0]
         
         gb_pred = self.gb_model.predict(X_scaled)[0]
         gb_proba = self.gb_model.predict_proba(X_scaled)[0]
         
-        deep_proba = self.deep_model.predict(X_scaled, verbose=0)[0]
-        deep_pred = np.argmax(deep_proba)
-        
-        # Ensemble voting (weighted average)
-        ensemble_proba = (0.3 * rf_proba + 0.3 * gb_proba + 0.4 * deep_proba)
+        # Average probabilities from both models
+        ensemble_proba = (0.5 * rf_proba + 0.5 * gb_proba)
         final_pred = np.argmax(ensemble_proba)
         confidence = float(np.max(ensemble_proba))
         
@@ -250,7 +356,6 @@ class ThreatClassifier:
             'model_predictions': {
                 'random_forest': self.label_encoder.inverse_transform([rf_pred])[0],
                 'gradient_boosting': self.label_encoder.inverse_transform([gb_pred])[0],
-                'deep_learning': self.label_encoder.inverse_transform([deep_pred])[0]
             },
             'probabilities': {
                 cat: float(ensemble_proba[i]) 
@@ -298,68 +403,143 @@ class ThreatClassifier:
     def _rule_based_prediction(self, log_entry):
         """
         Rule-based threat detection when ML models are not trained.
-        Provides basic threat detection using heuristics.
+        IMPROVED: Much lower false positive rate by whitelisting known-good processes.
         """
         threat_indicators = []
         confidence = 0.0
         threat_type = 'normal'
         
-        # Check for suspicious process names
         process_name = (log_entry.get('process_name') or '').lower()
-        suspicious_processes = ['mimikatz', 'psexec', 'procdump', 'netcat', 'nc.exe',
-                                'certutil', 'bitsadmin', 'powershell -enc', 'nmap', 'masscan']
-        for sp in suspicious_processes:
-            if sp in process_name:
-                threat_indicators.append(f'suspicious_process:{sp}')
-                threat_type = 'malware'
-                confidence = max(confidence, 0.85)
-        
-        # Check command line for suspicious patterns
         cmdline = (log_entry.get('cmdline') or '').lower()
-        if 'base64' in cmdline or '-enc' in cmdline:
-            threat_indicators.append('encoded_command')
-            threat_type = 'malware'
-            confidence = max(confidence, 0.8)
+        user = (log_entry.get('user') or '').lower()
         
-        # Check for high resource usage (potential crypto mining or DoS)
-        cpu_usage = log_entry.get('cpu_usage', 0) or 0
-        memory_usage = log_entry.get('memory_usage', 0) or 0
-        if cpu_usage > 90:
-            threat_indicators.append('high_cpu_usage')
-            if threat_type == 'normal':
-                threat_type = 'ddos'
-            confidence = max(confidence, 0.6)
-        if memory_usage > 85:
-            threat_indicators.append('high_memory_usage')
-            confidence = max(confidence, 0.5)
+        # =====================================================================
+        # WHITELIST: These are ALWAYS normal - don't flag them
+        # =====================================================================
+        safe_processes = [
+            # Windows System
+            'system', 'system idle process', 'registry', 'memory compression',
+            'svchost.exe', 'csrss.exe', 'lsass.exe', 'services.exe', 'wininit.exe',
+            'winlogon.exe', 'explorer.exe', 'smss.exe', 'spoolsv.exe', 'dwm.exe',
+            'searchindexer.exe', 'runtimebroker.exe', 'taskhostw.exe',
+            'shellexperiencehost.exe', 'sihost.exe', 'fontdrvhost.exe',
+            'ctfmon.exe', 'audiodg.exe', 'conhost.exe', 'dllhost.exe',
+            'wmiprvse.exe', 'searchui.exe', 'searchapp.exe', 'securityhealthservice.exe',
+            # Security software - NEVER flag these
+            'msmpeng.exe', 'nissrv.exe', 'mssense.exe', 'sense.exe',
+            # Browsers - high CPU/memory is NORMAL
+            'chrome.exe', 'firefox.exe', 'msedge.exe', 'brave.exe', 'opera.exe',
+            'iexplore.exe', 'safari.exe', 'vivaldi.exe',
+            # Development tools - 100% CPU is NORMAL during builds
+            'code.exe', 'devenv.exe', 'rider64.exe', 'pycharm64.exe', 'idea64.exe',
+            'python.exe', 'python3.exe', 'pythonw.exe', 'python3.11.exe', 'python3.12.exe',
+            'node.exe', 'npm.exe', 'npx.exe', 'yarn.exe', 'pnpm.exe',
+            'java.exe', 'javaw.exe', 'gradle.exe', 'mvn.exe',
+            'tsc.exe', 'webpack.exe', 'vite.exe', 'esbuild.exe',
+            'dotnet.exe', 'msbuild.exe', 'csc.exe', 'cl.exe',
+            'go.exe', 'rustc.exe', 'cargo.exe', 'gcc.exe', 'g++.exe', 'make.exe',
+            # Shells & Terminals - developers use these legitimately
+            'bash.exe', 'sh.exe', 'zsh.exe', 'fish.exe',
+            'cmd.exe', 'powershell.exe', 'pwsh.exe', 'windowsterminal.exe',
+            # Docker - high usage during builds is NORMAL
+            'docker.exe', 'docker desktop.exe', 'com.docker.backend.exe', 'dockerd.exe',
+            'wsl.exe', 'wslhost.exe', 'wslservice.exe', 'vmmemwsl',
+            # Git
+            'git.exe', 'git-remote-https.exe', 'ssh.exe', 'ssh-agent.exe',
+            # Office & Communication
+            'outlook.exe', 'winword.exe', 'excel.exe', 'powerpnt.exe',
+            'teams.exe', 'slack.exe', 'discord.exe', 'zoom.exe', 'skype.exe',
+            # Media
+            'spotify.exe', 'vlc.exe', 'wmplayer.exe',
+            # Database tools
+            'postgres.exe', 'mysql.exe', 'mongod.exe', 'redis-server.exe',
+        ]
         
-        # Check for suspicious network ports
+        # Quick exit for safe processes
+        if any(safe in process_name for safe in safe_processes):
+            return {
+                'threat_type': 'normal',
+                'classification': 'normal',
+                'confidence': 0.95,
+                'is_threat': False,
+                'risk_score': 0.05,
+                'severity': 'none',
+                'indicators': ['whitelisted_process'],
+                'model_predictions': {'rule_based': 'normal'},
+                'probabilities': {'normal': 0.95}
+            }
+        
+        # =====================================================================
+        # KNOWN MALICIOUS: These are ALWAYS threats
+        # =====================================================================
+        known_malware = ['mimikatz', 'psexec', 'procdump', 'winpeas', 'linpeas',
+                         'juicypotato', 'printspoofer', 'rubeus', 'sharphound',
+                         'bloodhound', 'cobaltstrike', 'meterpreter', 'empire']
+        for malware in known_malware:
+            if malware in process_name or malware in cmdline:
+                return {
+                    'threat_type': 'malware',
+                    'classification': 'malware',
+                    'confidence': 0.95,
+                    'is_threat': True,
+                    'risk_score': 0.95,
+                    'severity': 'critical',
+                    'indicators': [f'known_malware:{malware}'],
+                    'model_predictions': {'rule_based': 'malware'},
+                    'probabilities': {'malware': 0.95, 'normal': 0.05}
+                }
+        
+        # =====================================================================
+        # PROCESS NAME TYPOSQUATTING (common malware technique)
+        # =====================================================================
+        typosquat_patterns = {
+            'svchost': ['svchosts.exe', 'scvhost.exe', 'svhost.exe', 'svchost32.exe'],
+            'csrss': ['csrs.exe', 'csrrs.exe', 'cssrs.exe', 'csrss32.exe'],
+            'explorer': ['explore.exe', 'explorar.exe', 'explorer32.exe'],
+            'lsass': ['lsas.exe', 'lsass32.exe', 'lsasss.exe'],
+        }
+        for legit, fakes in typosquat_patterns.items():
+            if process_name in [f.lower() for f in fakes]:
+                threat_indicators.append(f'typosquatting:{legit}')
+                threat_type = 'trojan'
+                confidence = 0.9
+        
+        # =====================================================================
+        # SUSPICIOUS COMMAND LINE PATTERNS
+        # =====================================================================
+        suspicious_cmdline_patterns = [
+            ('encodedcommand', 'malware', 0.85),
+            ('downloadstring', 'malware', 0.85),
+            ('invoke-expression', 'malware', 0.8),
+            ('-nop -w hidden', 'malware', 0.9),
+            ('net user /add', 'privilege_escalation', 0.85),
+            ('reg add.*run', 'malware', 0.8),
+            ('sekurlsa', 'malware', 0.95),
+            ('lsadump', 'malware', 0.95),
+            ('--reverse-shell', 'trojan', 0.95),
+            ('--encrypt', 'ransomware', 0.8),
+            ('--ransom', 'ransomware', 0.9),
+        ]
+        for pattern, t_type, conf in suspicious_cmdline_patterns:
+            if pattern in cmdline:
+                threat_indicators.append(f'suspicious_cmdline:{pattern}')
+                threat_type = t_type
+                confidence = max(confidence, conf)
+        
+        # =====================================================================
+        # SUSPICIOUS PORTS (only flag if process is unknown)
+        # =====================================================================
         remote_port = log_entry.get('remote_port', 0) or 0
-        suspicious_ports = [4444, 5555, 6666, 31337, 12345, 1337]
-        if remote_port in suspicious_ports:
+        if remote_port in [4444, 5555, 6666, 31337, 12345, 1337]:
             threat_indicators.append(f'suspicious_port:{remote_port}')
-            threat_type = 'malware'
-            confidence = max(confidence, 0.9)
-        
-        # Check for privilege escalation indicators
-        if log_entry.get('is_suspicious', False):
-            threat_indicators.append('marked_suspicious')
-            confidence = max(confidence, 0.7)
             if threat_type == 'normal':
-                threat_type = 'privilege_escalation'
+                threat_type = 'trojan'
+            confidence = max(confidence, 0.75)
         
-        # Check for off-hours activity with high privilege
-        if not self._is_business_hours(log_entry.get('timestamp')):
-            user = (log_entry.get('user') or '').lower()
-            if 'admin' in user or 'root' in user:
-                threat_indicators.append('off_hours_admin_activity')
-                confidence = max(confidence, 0.65)
-                if threat_type == 'normal':
-                    threat_type = 'privilege_escalation'
-        
-        # Default confidence for normal activity
-        if threat_type == 'normal':
-            confidence = 0.95  # High confidence it's normal
+        # Default: if no indicators found, it's probably normal
+        if not threat_indicators:
+            threat_type = 'normal'
+            confidence = 0.85
         
         is_threat = threat_type != 'normal'
         risk_score = confidence * (0.9 if is_threat else 0.1)
@@ -371,10 +551,8 @@ class ThreatClassifier:
             'is_threat': is_threat,
             'risk_score': risk_score,
             'severity': self._get_severity(threat_type, confidence),
-            'indicators': threat_indicators,
-            'model_predictions': {
-                'rule_based': threat_type
-            },
+            'indicators': threat_indicators if threat_indicators else ['none'],
+            'model_predictions': {'rule_based': threat_type},
             'probabilities': {
                 threat_type: confidence,
                 'normal': 1 - confidence if is_threat else confidence

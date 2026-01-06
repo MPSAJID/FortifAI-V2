@@ -2,6 +2,7 @@
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { api } from './api'
 
 interface User {
   id: number
@@ -19,6 +20,7 @@ interface AuthState {
   isLoading: boolean
   
   // Actions
+  login: (username: string, password: string) => Promise<void>
   setAuth: (user: User, token: string, refreshToken: string) => void
   logout: () => void
   setLoading: (loading: boolean) => void
@@ -32,7 +34,30 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       refreshToken: null,
       isAuthenticated: false,
-      isLoading: true,
+      isLoading: false,
+
+      login: async (username: string, password: string) => {
+        set({ isLoading: true })
+        try {
+          const data = await api.login(username, password)
+          localStorage.setItem('token', data.access_token)
+          localStorage.setItem('refresh_token', data.refresh_token)
+          
+          // Fetch user profile
+          const user = await api.getCurrentUser()
+          
+          set({ 
+            user, 
+            token: data.access_token, 
+            refreshToken: data.refresh_token, 
+            isAuthenticated: true,
+            isLoading: false 
+          })
+        } catch (error) {
+          set({ isLoading: false })
+          throw error
+        }
+      },
 
       setAuth: (user, token, refreshToken) => {
         localStorage.setItem('token', token)

@@ -1,0 +1,1 @@
+["cpu_usage", "memory_usage", "name_length", "cmd_length", "has_args", "has_network", "connections", "is_system_user", "encoded_cmd", "download_cmd", "connect_cmd", "encrypt_cmd", "cred_dump", "is_mimikatz", "is_psexec", "is_bloodhound", "is_cobalt", "has_typo", "known_malware", "lateral_movement", "priv_esc"]

@@ -1,0 +1,23 @@
+{
+  "trained_at": "2026-01-06T02:52:07.413135",
+  "samples": 5397,
+  "contamination": 0.05,
+  "anomaly_ratio": 0.04984250509542339,
+  "baseline_stats": {
+    "cpu_mean": 5.052288308319437,
+    "cpu_std": 85.67429896907687,
+    "cpu_p95": 2.7,
+    "memory_mean": 0.21446262879634037,
+    "memory_std": 0.8640409708388254,
+    "memory_p95": 0.8945544377880024,
+    "threads_mean": 14.24550676301649,
+    "connections_mean": 0.42449508986473966
+  },
+  "feature_names": [
+    "cpu_usage",
+    "memory_usage",
+    "num_threads",
+    "connections",
+    "name_length"
+  ]
+}

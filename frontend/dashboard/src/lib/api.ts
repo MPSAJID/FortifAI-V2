@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_URL = process.env.API_URL || 'http://localhost:8000'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 const apiClient = axios.create({
   baseURL: API_URL,
@@ -24,7 +24,11 @@ export const api = {
     const formData = new URLSearchParams()
     formData.append('username', username)
     formData.append('password', password)
-    const response = await apiClient.post('/api/v1/auth/token', formData)
+    const response = await apiClient.post('/api/v1/auth/token', formData, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    })
     return response.data
   },
 
@@ -94,7 +98,7 @@ export const api = {
   },
 
   getCurrentUser: async () => {
-    const response = await apiClient.get('/api/v1/users/me')
+    const response = await apiClient.get('/api/v1/auth/me')
     return response.data
   },
 

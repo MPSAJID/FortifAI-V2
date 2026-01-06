@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const router = useRouter()
   const { login, isLoading } = useAuthStore()
-  const { showToast } = useToast()
+  const toast = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -21,12 +21,12 @@ export default function LoginPage() {
 
     try {
       await login(username, password)
-      showToast('Login successful!', 'success')
+      toast.success('Login successful!')
       router.push('/')
     } catch (err: any) {
       const message = err.message || 'Login failed. Please try again.'
       setError(message)
-      showToast(message, 'error')
+      toast.error(message)
     }
   }
 

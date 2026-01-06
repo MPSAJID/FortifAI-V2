@@ -87,16 +87,8 @@ async def login(
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user = Depends(get_current_user)
 ):
     """Get current user information"""
-    result = await db.execute(
-        select(User).where(User.username == current_user["username"])
-    )
-    user = result.scalar_one_or_none()
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    return user
+    # current_user is already a User object from the security dependency
+    return current_user

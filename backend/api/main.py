@@ -58,6 +58,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health.router, tags=["Health"])
+app.include_router(health.router, prefix="/api/v1", tags=["Health"])  # Also under /api/v1 for container health checks
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["Alerts"])
 app.include_router(threats.router, prefix="/api/v1/threats", tags=["Threats"])

@@ -88,9 +88,9 @@ CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_logs(created_at);
 INSERT INTO users (username, email, full_name, hashed_password, role)
 VALUES (
     'admin',
-    'admin@fortifai.local',
+    'admin@fortifai.com',
     'System Administrator',
-    '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.qdU.0dJ.3LyYXK',
+    '$2b$12$nGcslaw5VIwxzax7xLlYDuX7XyUI.9OU1ZucE3aB1ZuqwCcFScri6',
     'admin'
 ) ON CONFLICT (username) DO NOTHING;
 

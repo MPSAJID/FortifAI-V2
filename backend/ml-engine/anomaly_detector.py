@@ -2,7 +2,10 @@
 Anomaly Detection Module
 Uses Isolation Forest and statistical methods
 """
+import os
+import json
 import numpy as np
+import joblib
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 from typing import Dict, List, Any
@@ -13,7 +16,7 @@ class AnomalyDetector:
     Anomaly detection using Isolation Forest and statistical methods
     """
     
-    def __init__(self):
+    def __init__(self, model_path: str = None):
         self.model = IsolationForest(
             n_estimators=100,
             contamination=0.1,
@@ -23,6 +26,43 @@ class AnomalyDetector:
         self.is_trained = False
         self.baseline_stats = {}
         self.feature_names = []
+        
+        # Try to load pre-trained model
+        if model_path:
+            self.load_trained_model(model_path)
+        else:
+            # Check default paths
+            default_paths = [
+                '/app/models/anomaly',
+                '/app/models/trained',
+                './models/anomaly',
+            ]
+            for path in default_paths:
+                if os.path.exists(path) and os.path.exists(f'{path}/isolation_forest.joblib'):
+                    print(f"Found anomaly model at {path}")
+                    self.load_trained_model(path)
+                    break
+    
+    def load_trained_model(self, path: str) -> bool:
+        """Load pre-trained anomaly detector"""
+        try:
+            self.model = joblib.load(f'{path}/isolation_forest.joblib')
+            self.scaler = joblib.load(f'{path}/anomaly_scaler.joblib')
+            
+            if os.path.exists(f'{path}/baseline_stats.json'):
+                with open(f'{path}/baseline_stats.json', 'r') as f:
+                    self.baseline_stats = json.load(f)
+            
+            if os.path.exists(f'{path}/feature_names.json'):
+                with open(f'{path}/feature_names.json', 'r') as f:
+                    self.feature_names = json.load(f)
+            
+            self.is_trained = True
+            print(f"✓ Loaded anomaly detector from {path}")
+            return True
+        except Exception as e:
+            print(f"Could not load anomaly model from {path}: {e}")
+            return False
     
     def fit(self, data: List[Dict[str, Any]]):
         """Train the anomaly detector"""

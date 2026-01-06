@@ -46,6 +46,12 @@ services:
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-fortifai-internal-service-key}
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/api/v1/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
@@ -131,8 +137,10 @@ services:
       - COLLECTION_INTERVAL=30
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-fortifai-internal-service-key}
     depends_on:
-      - api
-      - ml-engine
+      api:
+        condition: service_healthy
+      ml-engine:
+        condition: service_started
     volumes:
       - /var/log:/var/log:ro
     networks:

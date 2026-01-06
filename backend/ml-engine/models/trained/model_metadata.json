@@ -1,0 +1,34 @@
+{
+  "trained_at": "2026-01-06T02:26:29.314985",
+  "samples": 19999,
+  "rf_accuracy": 0.993,
+  "gb_accuracy": 0.9945,
+  "classes": [
+    "brute_force",
+    "data_exfiltration",
+    "ddos",
+    "malware",
+    "normal",
+    "privilege_escalation",
+    "ransomware",
+    "trojan"
+  ],
+  "feature_columns": [
+    "cpu_usage",
+    "memory_usage",
+    "process_name_length",
+    "cmdline_length",
+    "has_args",
+    "is_system_user",
+    "has_network_activity",
+    "connection_count",
+    "has_encoded_cmd",
+    "has_download_cmd",
+    "has_connect_cmd",
+    "has_encrypt_cmd",
+    "is_mimikatz",
+    "is_psexec",
+    "is_procdump",
+    "has_typo"
+  ]
+}

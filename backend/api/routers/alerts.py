@@ -61,7 +61,7 @@ async def create_alert(
         message=alert_data.message,
         severity=alert_data.severity.upper(),
         source=alert_data.source,
-        metadata=alert_data.metadata
+        alert_metadata=alert_data.metadata or {}
     )
     
     db.add(db_alert)
@@ -86,7 +86,7 @@ async def create_alert_internal(
         message=alert_data.message,
         severity=alert_data.severity.upper(),
         source=alert_data.source,
-        metadata=alert_data.metadata
+        alert_metadata=alert_data.metadata or {}
     )
     
     db.add(db_alert)

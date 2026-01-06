@@ -1,0 +1,1 @@
+["cpu_usage", "memory_usage", "process_name_length", "cmdline_length", "has_args", "is_system_user", "has_network_activity", "connection_count", "has_encoded_cmd", "has_download_cmd", "has_connect_cmd", "has_encrypt_cmd", "is_mimikatz", "is_psexec", "is_procdump", "has_typo"]
