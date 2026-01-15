@@ -88,7 +88,7 @@ def check_services():
 def get_auth_token():
     """Get authentication token"""
     try:
-        r = requests.post(f'{API_BASE}/auth/login', json={
+        r = requests.post(f'{API_BASE}/api/v1/auth/login', json={
             'username': 'admin',
             'password': 'admin123'
         }, timeout=5)
@@ -149,7 +149,7 @@ def check_alerts(token=None):
         headers['Authorization'] = f'Bearer {token}'
     
     try:
-        r = requests.get(f'{API_BASE}/alerts?limit=5', headers=headers, timeout=5)
+        r = requests.get(f'{API_BASE}/api/v1/alerts?limit=5', headers=headers, timeout=5)
         if r.status_code == 200:
             return r.json()
     except:
@@ -654,6 +654,64 @@ class DataExfiltrationSimulation:
 # MAIN EXECUTION
 # =============================================================================
 
+def create_alert_in_db(threat_info, attack_name, token=None):
+    """Create an alert in the database"""
+    # Use internal API key for service-to-service communication
+    headers = {
+        'Content-Type': 'application/json',
+        'X-Internal-Key': os.getenv('INTERNAL_API_KEY', 'fortifai-internal-service-key')
+    }
+    
+    # Map threat classification to severity
+    severity_map = {
+        'ransomware': 'CRITICAL',
+        'malware': 'CRITICAL',
+        'ddos': 'HIGH',
+        'brute_force': 'HIGH',
+        'data_exfiltration': 'CRITICAL',
+        'privilege_escalation': 'HIGH',
+        'reconnaissance': 'MEDIUM',
+        'credential_dumping': 'CRITICAL',
+        'suspicious': 'MEDIUM',
+        'unknown': 'MEDIUM'
+    }
+    
+    classification = threat_info.get('classification', 'unknown')
+    severity = severity_map.get(classification, 'HIGH')
+    
+    alert_data = {
+        'title': f"{attack_name} Detected: {threat_info['process']}",
+        'message': f"Suspicious process '{threat_info['process']}' detected with {threat_info['confidence']:.1%} confidence. "
+                   f"Classification: {classification}. Risk Score: {threat_info['risk_score']:.2f}",
+        'severity': severity,
+        'source': 'threat_simulation',
+        'metadata': {
+            'process': threat_info['process'],
+            'classification': classification,
+            'threat_type': threat_info.get('threat_type', 'unknown'),
+            'confidence': threat_info['confidence'],
+            'risk_score': threat_info['risk_score'],
+            'anomaly_score': threat_info.get('anomaly_score', 0),
+            'is_anomaly': threat_info.get('is_anomaly', False),
+            'recommendations': threat_info.get('recommendations', []),
+            'attack_name': attack_name
+        }
+    }
+    
+    try:
+        # Use internal endpoint that doesn't require user authentication
+        r = requests.post(f'{API_BASE}/api/v1/alerts/internal', json=alert_data, headers=headers, timeout=5)
+        if r.status_code in [200, 201]:
+            log('SUCCESS', f"  ✓ Alert created in database")
+            return r.json()
+        else:
+            log('WARN', f"  Failed to create alert: {r.status_code} - {r.text[:200]}")
+            return None
+    except Exception as e:
+        log('WARN', f"  Failed to create alert: {e}")
+        return None
+
+
 def analyze_and_report(process_data, attack_name, token=None):
     """Submit data to ML engine and check for detection"""
     print(f"\n{Colors.CYAN}═══════════════════════════════════════════════════════════════{Colors.RESET}")
@@ -682,7 +740,7 @@ def analyze_and_report(process_data, attack_name, token=None):
                 log_index = threat.get('log_index', 0)
                 proc_name = processes[log_index]['name'] if log_index < len(processes) else 'unknown'
                 
-                detected_threats.append({
+                threat_info = {
                     'process': proc_name,
                     'classification': threat.get('classification', 'unknown'),
                     'threat_type': threat.get('threat_type', 'unknown'),
@@ -691,7 +749,9 @@ def analyze_and_report(process_data, attack_name, token=None):
                     'anomaly_score': threat.get('anomaly_score', 0),
                     'is_anomaly': threat.get('anomaly_score', 0) < -0.5,
                     'recommendations': threat.get('recommendations', [])
-                })
+                }
+                
+                detected_threats.append(threat_info)
                 
                 conf = threat.get('confidence', 0)
                 classification = threat.get('classification', 'unknown')
@@ -699,6 +759,9 @@ def analyze_and_report(process_data, attack_name, token=None):
                 log('SUCCESS', f"    Classification: {classification}")
                 log('SUCCESS', f"    Confidence: {conf:.1%}")
                 log('SUCCESS', f"    Risk Score: {threat.get('risk_score', 0):.2f}")
+                
+                # Create alert in database
+                create_alert_in_db(threat_info, attack_name, token)
         else:
             log('WARN', f"No threats detected in {total_analyzed} processes")
     else:
@@ -822,7 +885,7 @@ def main():
     
     print(f"\n{Colors.GREEN}Simulation complete!{Colors.RESET}")
     print(f"\nTo check generated alerts:")
-    print(f"  curl http://localhost:8000/alerts")
+    print(f"  curl http://localhost:8000/api/v1/alerts")
     print(f"\nTo view in dashboard:")
     print(f"  http://localhost:3000/alerts")
 

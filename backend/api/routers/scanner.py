@@ -7,6 +7,7 @@ Integrated from SubVeil project
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel, HttpUrl
 from typing import List, Optional
+from datetime import datetime
 import tempfile
 import os
 
@@ -192,32 +193,62 @@ async def quick_scan_url(request: URLRequest):
     
     # Calculate quick score
     score = 0
+    findings = []
+    
+    # SSL Scoring
     if ssl_result.get('enabled'):
         score += 40
         if ssl_result.get('valid'):
             score += 20
+            findings.append({
+                'type': 'success',
+                'message': f"SSL certificate is valid (expires {ssl_result.get('expires', 'N/A')})"
+            })
+        else:
+            findings.append({
+                'type': 'warning',
+                'message': 'SSL certificate is present but invalid or expired'
+            })
+    else:
+        findings.append({
+            'type': 'danger',
+            'message': 'No SSL/TLS encryption enabled'
+        })
     
+    # Security Headers Scoring
     present_headers = headers_result.get('present_count', 0)
+    total_headers = headers_result.get('total_headers', 8)
     score += min(present_headers * 5, 40)
+    
+    if present_headers >= 6:
+        findings.append({
+            'type': 'success',
+            'message': f'{present_headers}/{total_headers} security headers implemented'
+        })
+    elif present_headers >= 3:
+        findings.append({
+            'type': 'warning',
+            'message': f'Only {present_headers}/{total_headers} security headers present'
+        })
+    else:
+        findings.append({
+            'type': 'danger',
+            'message': f'Missing critical security headers ({present_headers}/{total_headers})'
+        })
     
     grade = 'A' if score >= 80 else 'B' if score >= 60 else 'C' if score >= 40 else 'D' if score >= 20 else 'F'
     
+    # Return in same format as deep scan for frontend compatibility
     return {
         "success": True,
-        "url": url,
-        "quick_score": score,
-        "grade": grade,
-        "ssl": {
-            "enabled": ssl_result.get('enabled', False),
-            "valid": ssl_result.get('valid', False),
-            "expires": ssl_result.get('expires'),
-            "issuer": ssl_result.get('issuer')
-        },
-        "security_headers": {
-            "present_count": present_headers,
-            "total": headers_result.get('total_headers', 8),
-            "score_percentage": headers_result.get('score', 0)
-        }
+        "target": url,
+        "hostname": scanner.hostname,
+        "scan_time": datetime.now().isoformat(),
+        "security_score": score,
+        "security_grade": grade,
+        "ssl_analysis": ssl_result,
+        "security_headers": headers_result,
+        "findings": findings
     }
 
 
