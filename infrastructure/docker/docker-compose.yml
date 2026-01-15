@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   # PostgreSQL Database
   postgres:
@@ -6,7 +8,7 @@ services:
     environment:
       POSTGRES_USER: ${DB_USER:-fortifai}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-fortifai_secure_password}
-      POSTGRES_DB: ${DB_NAME:-fortifai}
+      POSTGRES_DB: ${DB_NAME:-fortifai_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -97,6 +99,7 @@ services:
       - SMTP_USERNAME=${SMTP_USERNAME:-}
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
       - FROM_EMAIL=${FROM_EMAIL:-}
+      - ALERT_EMAIL_TO=${ALERT_EMAIL_TO:-}
       - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
       - TEAMS_WEBHOOK_URL=${TEAMS_WEBHOOK_URL:-}
     ports:
@@ -104,6 +107,9 @@ services:
     depends_on:
       - postgres
       - redis
+    volumes:
+      - ../../backend/alert-service:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 5001 --reload
     networks:
       - fortifai-network
 
