@@ -19,6 +19,42 @@ cp .env.example .env
 # Edit .env with your settings
 ```
 
+**Required Environment Variables:**
+
+```bash
+# Database
+DATABASE_URL=postgresql://fortifai:fortifai_secure_password@postgres:5432/fortifai_db
+
+# Redis
+REDIS_URL=redis://redis:6379
+
+# Security
+SECRET_KEY=your-super-secret-key-change-in-production
+INTERNAL_API_KEY=fortifai-internal-service-key
+
+# Email Notifications (SMTP)
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+FROM_EMAIL=your-email@gmail.com
+ALERT_EMAIL_TO=recipient@example.com
+
+# Slack Notifications (Optional)
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+
+# Microsoft Teams Notifications (Optional)
+TEAMS_WEBHOOK_URL=https://outlook.office.com/webhook/YOUR/WEBHOOK/URL
+```
+
+**Setting up Gmail for SMTP:**
+
+1. Enable 2-Factor Authentication on your Google account
+2. Go to Google Account > Security > App passwords
+3. Generate a new app password for "Mail"
+4. Use the 16-character password (without spaces) as `SMTP_PASSWORD`
+5. Set `SMTP_USERNAME` to your Gmail address
+
 2. **Start Services**
 
 ```bash
@@ -135,3 +171,64 @@ terraform apply -var="environment=production"
 - [ ] Configure database backups
 - [ ] Set up disaster recovery
 - [ ] Test restore procedures
+
+## Troubleshooting
+
+### Email Notifications Not Working
+
+**Check SMTP configuration:**
+```bash
+docker exec fortifai-alerts env | grep SMTP
+```
+
+**Test SMTP connection:**
+```bash
+curl -X POST http://localhost:5001/api/test-smtp
+```
+
+**Common issues:**
+- Gmail blocking: Use App Password, not regular password
+- Firewall: Ensure port 587 (SMTP) is allowed
+- Missing `ALERT_EMAIL_TO`: Must be set in docker-compose.yml
+- Check spam folder for test emails
+
+### Database Connection Errors
+
+**Issue**: `database "fortifai_db" does not exist`
+
+**Solution:**
+```bash
+cd infrastructure/docker
+docker-compose down
+docker volume rm docker_postgres_data
+docker-compose up -d
+```
+
+### ML Engine Feature Extraction Errors
+
+**Issue**: KeyError on feature names
+
+**Solution**: Ensure feature names in `threat_classifier.py` match trained model:
+- Use `process_name_length` not `name_length`
+- Use `cmdline_length` not `cmd_length`
+- Include all 22 required features
+
+### Docker Networking Issues
+
+**Issue**: Services can't communicate
+
+**Solution**: Use service names in URLs, not `localhost`:
+- ✓ `postgresql://fortifai:password@postgres:5432/fortifai_db`
+- ✗ `postgresql://fortifai:password@localhost:5432/fortifai_db`
+
+### Container Logs
+
+```bash
+# View all service logs
+docker-compose logs -f
+
+# View specific service
+docker logs fortifai-api -f
+docker logs fortifai-ml -f
+docker logs fortifai-alerts -f
+```

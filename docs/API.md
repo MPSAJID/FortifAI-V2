@@ -45,9 +45,12 @@ GET /live
 |--------|----------|-------------|
 | GET | `/api/v1/alerts` | List all alerts |
 | POST | `/api/v1/alerts` | Create new alert |
+| POST | `/api/v1/alerts/internal` | Create alert (internal service) |
 | GET | `/api/v1/alerts/{id}` | Get alert by ID |
 | PATCH | `/api/v1/alerts/{id}` | Update alert |
 | GET | `/api/v1/alerts/stats/summary` | Get alert statistics |
+
+**Note**: Internal endpoints require `X-Internal-Key` header for service-to-service authentication. CRITICAL alerts automatically trigger email notifications.
 
 ### Threats
 
@@ -55,6 +58,7 @@ GET /live
 |--------|----------|-------------|
 | GET | `/api/v1/threats` | List detected threats |
 | POST | `/api/v1/threats` | Log new threat |
+| POST | `/api/v1/threats/internal` | Log threat (internal service) |
 | POST | `/api/v1/threats/analyze` | Analyze log for threats |
 | GET | `/api/v1/threats/stats/summary` | Get threat statistics |
 
@@ -183,6 +187,48 @@ Response:
     "analyst": 5,
     "viewer": 3
   }
+}
+```
+
+## Alert Service Endpoints
+
+The Alert Service runs on port 5001 and handles multi-channel notifications:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health check |
+| POST | `/api/notify` | Send notification for alert |
+| POST | `/api/test-smtp` | Test SMTP email configuration |
+| POST | `/alerts` | Create alert (legacy) |
+| GET | `/alerts` | List alerts |
+
+### Test SMTP Configuration
+
+```bash
+POST http://localhost:5001/api/test-smtp
+Content-Type: application/json
+```
+
+Response:
+```json
+{
+  "status": "success",
+  "message": "SMTP test email sent successfully"
+}
+```
+
+### Send Critical Alert Notification
+
+```bash
+POST http://localhost:5001/api/notify
+Content-Type: application/json
+
+{
+  "title": "Critical Security Threat Detected",
+  "message": "DDoS attack detected with 95% confidence",
+  "severity": "CRITICAL",
+  "source": "ML-Engine",
+  "metadata": {}
 }
 ```
 

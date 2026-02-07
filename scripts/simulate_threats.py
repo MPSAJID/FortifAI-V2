@@ -712,6 +712,42 @@ def create_alert_in_db(threat_info, attack_name, token=None):
         return None
 
 
+def create_threat_log(threat_info, attack_name, token=None):
+    """Log detected threat into the Threats API so the threats page shows entries"""
+    headers = {'Content-Type': 'application/json'}
+    # Use internal service key for service-to-service calls when available
+    headers['X-Internal-Key'] = os.getenv('INTERNAL_API_KEY', 'fortifai-internal-service-key')
+    if token:
+        headers['Authorization'] = f'Bearer {token}'
+
+    payload = {
+        'threat_type': threat_info.get('threat_type', threat_info.get('classification', 'unknown')),
+        'process_name': threat_info.get('process'),
+        'source_ip': threat_info.get('source_ip'),
+        'destination_ip': threat_info.get('destination_ip'),
+        'user': threat_info.get('username') or threat_info.get('user'),
+        'raw_log': threat_info,
+        'metadata': {
+            'attack_name': attack_name,
+            'classification': threat_info.get('classification'),
+            'confidence': threat_info.get('confidence'),
+            'risk_score': threat_info.get('risk_score')
+        }
+    }
+
+    try:
+        r = requests.post(f'{API_BASE}/api/v1/threats/internal', json=payload, headers=headers, timeout=5)
+        if r.status_code in [200, 201]:
+            log('SUCCESS', f"  ✓ Threat logged to /api/v1/threats")
+            return r.json()
+        else:
+            log('WARN', f"  Failed to log threat: {r.status_code} - {r.text[:200]}")
+            return None
+    except Exception as e:
+        log('WARN', f"  Failed to log threat: {e}")
+        return None
+
+
 def analyze_and_report(process_data, attack_name, token=None):
     """Submit data to ML engine and check for detection"""
     print(f"\n{Colors.CYAN}═══════════════════════════════════════════════════════════════{Colors.RESET}")
@@ -762,6 +798,8 @@ def analyze_and_report(process_data, attack_name, token=None):
                 
                 # Create alert in database
                 create_alert_in_db(threat_info, attack_name, token)
+                # Also log the threat so the threats page shows the detection
+                create_threat_log(threat_info, attack_name, token)
         else:
             log('WARN', f"No threats detected in {total_analyzed} processes")
     else:

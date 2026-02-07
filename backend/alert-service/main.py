@@ -57,9 +57,13 @@ class AlertManager:
         self.slack_webhook = os.getenv('SLACK_WEBHOOK_URL')
         self.teams_webhook = os.getenv('TEAMS_WEBHOOK_URL')
         
+        print("[INIT] AlertManager initialized")
+        print(f"[INIT] Email config: smtp_server={self.email_config['smtp_server']}, username={bool(self.email_config['username'])}")
+        
         # Start processing thread
         self.processing_thread = threading.Thread(target=self._process_alerts, daemon=True)
         self.processing_thread.start()
+        print("[INIT] Background processing thread started")
     
     def create_alert(self, title: str, message: str, severity: str, source: str, metadata: dict = None):
         """Create a new alert"""
@@ -76,21 +80,27 @@ class AlertManager:
             'resolved': False
         }
         
+        print(f"[CREATE] Adding alert to queue: {alert['id']} (severity={alert['severity']})")
         self.alert_queue.put(alert)
+        print(f"[CREATE] Alert added to queue. Queue size: {self.alert_queue.qsize()}")
         self.alert_history.append(alert)
         
         return alert
     
     def _process_alerts(self):
         """Background thread to process alerts"""
+        print("[BACKGROUND] Alert processing thread started")
         while True:
             try:
                 alert = self.alert_queue.get(timeout=1)
+                print(f"[BACKGROUND] Processing alert: {alert['id']} - {alert['title']}")
                 self._dispatch_alert(alert)
             except queue.Empty:
                 continue
             except Exception as e:
-                print(f"Error processing alert: {e}")
+                print(f"[BACKGROUND] Error processing alert: {e}")
+                import traceback
+                traceback.print_exc()
     
     def _dispatch_alert(self, alert: dict):
         """Dispatch alert to configured channels"""
@@ -109,13 +119,18 @@ class AlertManager:
     
     def _send_email_alert(self, alert: dict):
         """Send alert via email"""
+        print(f"[EMAIL] Checking email config: username={bool(self.email_config['username'])}")
         if not self.email_config['username']:
+            print("[EMAIL] No SMTP username configured, skipping email send")
             return
         
         try:
+            recipient = os.getenv('ALERT_EMAIL_TO', '')
+            print(f"[EMAIL] Preparing email from {self.email_config['from_email']} to {recipient}")
+            
             msg = MIMEMultipart()
             msg['From'] = self.email_config['from_email']
-            msg['To'] = os.getenv('ALERT_EMAIL_TO', '')
+            msg['To'] = recipient
             msg['Subject'] = f"[{alert['severity']}] {alert['title']}"
             
             body = f"""
@@ -129,13 +144,20 @@ class AlertManager:
             
             msg.attach(MIMEText(body, 'plain'))
             
+            print(f"[EMAIL] Connecting to {self.email_config['smtp_server']}:{self.email_config['smtp_port']}")
             with smtplib.SMTP(self.email_config['smtp_server'], self.email_config['smtp_port']) as server:
+                print("[EMAIL] SMTP connection established, starting TLS...")
                 server.starttls()
+                print(f"[EMAIL] TLS started, logging in as {self.email_config['username']}")
                 server.login(self.email_config['username'], self.email_config['password'])
+                print(f"[EMAIL] Login successful, sending message...")
                 server.send_message(msg)
+                print("[EMAIL] Email sent successfully!")
                 
         except Exception as e:
-            print(f"Email alert failed: {e}")
+            print(f"[EMAIL] ERROR - Email alert failed: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _send_slack_alert(self, alert: dict):
         """Send alert to Slack"""
@@ -235,8 +257,57 @@ alert_manager = AlertManager()
 async def health():
     return {"status": "healthy", "service": "alert-service"}
 
+@app.post("/api/test-smtp")
+async def test_smtp():
+    """Test SMTP connection and send test email"""
+    print("[TEST] Testing SMTP connection...")
+    config = alert_manager.email_config
+    
+    if not config['username']:
+        return {"status": "error", "message": "No SMTP credentials configured"}
+    
+    try:
+        print(f"[TEST] Connecting to {config['smtp_server']}:{config['smtp_port']}")
+        with smtplib.SMTP(config['smtp_server'], config['smtp_port'], timeout=10) as server:
+            print("[TEST] SMTP connection established")
+            server.starttls()
+            print("[TEST] TLS started")
+            server.login(config['username'], config['password'])
+            print("[TEST] Login successful")
+            
+            # Create test email
+            msg = MIMEMultipart()
+            msg['From'] = config['from_email']
+            msg['To'] = os.getenv('ALERT_EMAIL_TO', 'ajack6590@gmail.com')
+            msg['Subject'] = "[TEST] FortifAI SMTP Connection Test"
+            msg.attach(MIMEText("This is a test email from FortifAI Alert Service.\n\nIf you received this, SMTP is working correctly!", 'plain'))
+            
+            print(f"[TEST] Sending test email...")
+            server.send_message(msg)
+            print("[TEST] Test email sent successfully!")
+            
+            return {"status": "success", "message": "SMTP test email sent successfully"}
+            
+    except Exception as e:
+        print(f"[TEST] ERROR: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": f"{type(e).__name__}: {str(e)}"}
+
 @app.post("/alerts")
 async def create_alert(alert_data: AlertCreate):
+    alert = alert_manager.create_alert(
+        title=alert_data.title,
+        message=alert_data.message,
+        severity=alert_data.severity,
+        source=alert_data.source,
+        metadata=alert_data.metadata
+    )
+    return alert
+
+@app.post("/api/notify")
+async def notify_alert(alert_data: AlertCreate):
+    """Endpoint for API service to send email notifications for critical alerts"""
     alert = alert_manager.create_alert(
         title=alert_data.title,
         message=alert_data.message,
