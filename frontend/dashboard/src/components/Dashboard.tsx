@@ -93,16 +93,7 @@ export default function Dashboard() {
           color="red"
           href="/alerts"
         />
-        <StatsCard
-          title="Active Threats"
-          value={stats?.summary?.total_threats || 0}
-          icon={Shield}
-          trend="+5%"
-          trendUp={false}
-          trendLabel="vs last week"
-          color="orange"
-          href="/threats"
-        />
+
         <StatsCard
           title="System Health"
           value={stats?.summary?.system_health === 'operational' ? 'Healthy' : 'Warning'}
@@ -268,20 +259,6 @@ export default function Dashboard() {
             <div>
               <h3 className="font-semibold text-gray-900">Analytics</h3>
               <p className="text-sm text-gray-500">View detailed reports</p>
-            </div>
-          </div>
-        </a>
-        
-        <a href="/threats" className="group card-interactive">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl 
-                          bg-orange-100 text-orange-600 group-hover:bg-orange-600 group-hover:text-white 
-                          transition-colors">
-              <Eye className="h-6 w-6" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Threat Monitor</h3>
-              <p className="text-sm text-gray-500">Track detected threats</p>
             </div>
           </div>
         </a>

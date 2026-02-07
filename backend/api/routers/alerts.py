@@ -6,6 +6,7 @@ from typing import List, Optional
 from datetime import datetime
 import uuid
 import os
+import httpx
 
 from backend.api.core.database import get_db
 from backend.api.core.security import get_current_user
@@ -23,6 +24,32 @@ async def verify_internal_service(x_internal_key: Optional[str] = Header(None, a
     if x_internal_key != INTERNAL_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid internal service key")
     return True
+
+
+async def notify_critical_alert(alert_title: str, alert_message: str, severity: str, source: str):
+    """Send email notification for critical alerts"""
+    if severity.upper() != "CRITICAL":
+        return  # Only notify for critical alerts
+    
+    alert_service_url = os.getenv("ALERT_SERVICE_URL", "http://alert-service:5001")
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            payload = {
+                "title": alert_title,
+                "message": alert_message,
+                "severity": severity,
+                "source": source,
+                "metadata": {}
+            }
+            await client.post(
+                f"{alert_service_url}/api/notify",
+                json=payload,
+                timeout=10.0
+            )
+    except Exception as e:
+        # Log but don't fail the alert creation if notification fails
+        print(f"Failed to send alert notification: {e}")
 
 @router.get("/", response_model=List[AlertResponse])
 async def get_alerts(
@@ -68,6 +95,9 @@ async def create_alert(
     await db.commit()
     await db.refresh(db_alert)
     
+    # Send email notification if critical
+    await notify_critical_alert(alert_data.title, alert_data.message, alert_data.severity, alert_data.source)
+    
     return db_alert
 
 
@@ -92,6 +122,9 @@ async def create_alert_internal(
     db.add(db_alert)
     await db.commit()
     await db.refresh(db_alert)
+    
+    # Send email notification if critical
+    await notify_critical_alert(alert_data.title, alert_data.message, alert_data.severity, alert_data.source)
     
     return db_alert
 

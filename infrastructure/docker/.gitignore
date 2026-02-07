@@ -1,0 +1,66 @@
+# Byte-compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+
+# ML Models (large files)
+*.h5
+*.pkl
+*.joblib
+ml-models/*/*.joblib
+ml-models/*/*.h5
+
+# Node.js
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Test coverage
+htmlcov/
+.coverage
+.pytest_cache/
+coverage/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+
+# Temporary files
+tmp/
+temp/
+*.tmp

@@ -12,7 +12,11 @@ FortifAI is a comprehensive security platform that uses machine learning to dete
 - **Threat Detection**: ML-powered threat classification with support for malware, ransomware, DDoS, and more
 - **User Behavior Analytics (UEBA)**: Detect insider threats and compromised accounts
 - **Anomaly Detection**: Identify unusual patterns in system and network activity
-- **Real-time Alerts**: Multi-channel notifications (Email, Slack, Teams)
+- **Real-time Alerts**: Multi-channel notifications with automatic email delivery for critical threats
+  - Email notifications via SMTP (Gmail, Outlook, custom servers)
+  - Slack webhook integration
+  - Microsoft Teams integration
+  - Background alert processing with retry logic
 - **Security Dashboard**: React-based visualization of security metrics
 - **RESTful API**: Full API access for integration with existing tools
 
@@ -112,6 +116,33 @@ npm run dev
 Once running, access the API docs at:
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
+
+## Environment Variables
+
+Key configuration variables in `infrastructure/docker/.env`:
+
+```bash
+# Database
+DATABASE_URL=postgresql://fortifai:password@postgres:5432/fortifai_db
+
+# Security
+SECRET_KEY=your-secret-key
+INTERNAL_API_KEY=fortifai-internal-service-key
+
+# Email Notifications
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-gmail-app-password
+FROM_EMAIL=your-email@gmail.com
+ALERT_EMAIL_TO=recipient@example.com
+
+# Optional: Slack & Teams
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+TEAMS_WEBHOOK_URL=https://outlook.office.com/webhook/...
+```
+
+See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for Gmail SMTP setup instructions.
 
 ## Default Credentials
 

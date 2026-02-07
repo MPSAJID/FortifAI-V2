@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation'
 import { 
   LayoutDashboard, 
   AlertTriangle, 
-  Shield, 
   Activity, 
   Users,
   Settings,
@@ -16,7 +15,8 @@ import {
   ChevronRight,
   Bell,
   HelpCircle,
-  Zap
+  Zap,
+  Shield
 } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 
@@ -24,7 +24,6 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, description: 'Overview & metrics' },
   { name: 'Scanner', href: '/scanner', icon: Search, description: 'URL security analysis' },
   { name: 'Alerts', href: '/alerts', icon: AlertTriangle, description: 'Security alerts', badge: 3 },
-  { name: 'Threats', href: '/threats', icon: Shield, description: 'Detected threats' },
   { name: 'Analytics', href: '/analytics', icon: Activity, description: 'Reports & insights' },
 ]
 

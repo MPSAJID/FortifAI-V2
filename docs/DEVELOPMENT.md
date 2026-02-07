@@ -31,8 +31,32 @@ python main.py
 
 # Alert Service
 cd backend/alert-service
-python main.py
+uvicorn main:app --reload --port 5001
 ```
+
+### Docker Development with Live Reload
+
+For development with Docker and live code reloading:
+
+**docker-compose.yml configuration:**
+```yaml
+services:
+  api:
+    volumes:
+      - ../../backend/api:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+  
+  ml-engine:
+    volumes:
+      - ../../backend/ml-engine:/app
+  
+  alert-service:
+    volumes:
+      - ../../backend/alert-service:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 5001 --reload
+```
+
+This allows editing code on your host machine while services run in Docker with automatic reloading.
 
 ### Frontend
 
@@ -89,6 +113,64 @@ npm test
 ### Writing Tests
 
 See `tests/` directory for examples.
+
+## Debugging
+
+### Print Debugging in Docker
+
+Add print statements or logging:
+```python
+print(f"[DEBUG] Variable value: {my_var}")
+import traceback
+traceback.print_exc()
+```
+
+View output:
+```bash
+docker logs fortifai-api -f
+```
+
+### Testing Email Notifications
+
+```bash
+# Test SMTP connection
+curl -X POST http://localhost:5001/api/test-smtp
+
+# Create test critical alert
+curl -X POST http://localhost:5001/api/notify \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Test Alert",
+    "message": "Testing email delivery",
+    "severity": "CRITICAL",
+    "source": "test",
+    "metadata": {}
+  }'
+```
+
+### Common Development Issues
+
+**Module not found errors:**
+```bash
+# Rebuild Docker images
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+**Database schema changes:**
+```bash
+# Drop and recreate database
+docker-compose down
+docker volume rm docker_postgres_data
+docker-compose up -d
+```
+
+**Port conflicts:**
+```bash
+# Check what's using the port
+lsof -i :8000  # Linux/Mac
+netstat -ano | findstr :8000  # Windows
+```
 
 ## Contributing
 

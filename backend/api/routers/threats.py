@@ -1,5 +1,5 @@
 """Threats Router"""
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from typing import List, Optional
@@ -12,6 +12,17 @@ from backend.api.core.security import get_current_user
 from backend.api.core.config import settings
 from backend.api.models.threat import ThreatLog
 from backend.api.schemas.threat import ThreatLogCreate, ThreatLogResponse, ThreatAnalysisRequest, ThreatAnalysisResponse
+import os
+
+# Internal service API key for service-to-service communication
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "fortifai-internal-service-key")
+
+
+async def verify_internal_service(x_internal_key: Optional[str] = Header(None, alias="X-Internal-Key")):
+    """Verify internal service API key"""
+    if x_internal_key != INTERNAL_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid internal service key")
+    return True
 
 router = APIRouter()
 
@@ -56,6 +67,34 @@ async def log_threat(
         user=threat_data.user,
         raw_log=threat_data.raw_log,
         metadata=threat_data.metadata
+    )
+    
+    db.add(db_threat)
+    await db.commit()
+    await db.refresh(db_threat)
+    
+    return db_threat
+
+
+@router.post("/internal", response_model=ThreatLogResponse)
+async def log_threat_internal(
+    threat_data: ThreatLogCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_internal_service)
+):
+    """Log a new threat detection from internal services (no user auth required)"""
+    threat_id = f"THREAT-{datetime.now().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:8]}"
+    
+    db_threat = ThreatLog(
+        threat_id=threat_id,
+        threat_type=threat_data.threat_type,
+        source_ip=threat_data.source_ip,
+        destination_ip=threat_data.destination_ip,
+        process_name=threat_data.process_name,
+        file_path=threat_data.file_path,
+        user=threat_data.user,
+        raw_log=threat_data.raw_log,
+        threat_metadata=threat_data.metadata
     )
     
     db.add(db_threat)
